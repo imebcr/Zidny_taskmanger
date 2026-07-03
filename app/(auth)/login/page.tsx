@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
@@ -28,7 +28,7 @@ export default function LoginPage() {
         redirect: false,
       })
       if (res?.error) {
-        setError('Identifiants incorrects. VÃ©rifiez votre email/nom d\'utilisateur et mot de passe.')
+        setError('Identifiants incorrects. Vérifiez votre email/nom d\'utilisateur et mot de passe.')
       } else {
         router.push('/dashboard')
         router.refresh()
@@ -50,7 +50,7 @@ export default function LoginPage() {
           <ZidnyIcon size={80} className="rounded-2xl shadow-sm" />
         </div>
         <h1 className="text-2xl font-bold text-navy">Bienvenue</h1>
-        <p className="text-navy/45 text-sm mt-1">Connectez-vous Ã  votre espace Zidny</p>
+        <p className="text-navy/45 text-sm mt-1">Connectez-vous à votre espace Zidny</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -72,7 +72,7 @@ export default function LoginPage() {
               type={showPwd ? 'text' : 'password'}
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+              placeholder="••••••••"
               required
               style={{ paddingRight: '2.5rem' }}
             />
@@ -98,7 +98,7 @@ export default function LoginPage() {
             Se souvenir de moi
           </label>
           <Link href="/forgot-password" className="text-sm text-brand hover:text-ocean transition-colors">
-            Mot de passe oubliÃ© ?
+            Mot de passe oublié ?
           </Link>
         </div>
 
@@ -117,7 +117,7 @@ export default function LoginPage() {
           disabled={loading}
           className="w-full bg-brand hover:bg-ocean text-white font-semibold rounded-xl py-2.5 shadow-sm shadow-brand/25 transition-colors disabled:opacity-60"
         >
-          {loading ? 'Connexionâ€¦' : 'Se connecter'}
+          {loading ? 'Connexion…' : 'Se connecter'}
         </button>
       </form>
 
@@ -130,4 +130,3 @@ export default function LoginPage() {
     </motion.div>
   )
 }
-

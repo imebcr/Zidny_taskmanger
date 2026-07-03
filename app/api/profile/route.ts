@@ -6,6 +6,8 @@ import { z } from 'zod'
 
 const schema = z.object({
   fullName: z.string().min(2).optional(),
+  username: z.string().min(2).regex(/^[a-z0-9_]+$/).optional(),
+  email: z.string().email('Email invalide').optional(),
   department: z.string().optional(),
   notifyEmail: z.boolean().optional(),
   notifyPush: z.boolean().optional(),
@@ -25,6 +27,18 @@ export async function PATCH(req: NextRequest) {
     if (body.department !== undefined) data.department = body.department
     if (body.notifyEmail !== undefined) data.notifyEmail = body.notifyEmail
     if (body.notifyPush !== undefined) data.notifyPush = body.notifyPush
+
+    if (body.username) {
+      const taken = await prisma.user.findFirst({ where: { username: body.username, NOT: { id: session.user.id } } })
+      if (taken) return NextResponse.json({ error: "Ce nom d'utilisateur est déjà pris" }, { status: 400 })
+      data.username = body.username
+    }
+
+    if (body.email) {
+      const taken = await prisma.user.findFirst({ where: { email: body.email, NOT: { id: session.user.id } } })
+      if (taken) return NextResponse.json({ error: 'Cet email est déjà utilisé' }, { status: 400 })
+      data.email = body.email
+    }
 
     if (body.currentPassword && body.newPassword) {
       const user = await prisma.user.findUnique({ where: { id: session.user.id } })

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
 import { motion } from 'framer-motion'
 import { User, Bell, Lock, Check, Eye, EyeOff } from 'lucide-react'
 import { format } from 'date-fns'
@@ -14,9 +13,10 @@ interface Profile {
 }
 
 export default function ProfilePage() {
-  const { data: session } = useSession()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [fullName, setFullName] = useState('')
+  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [notifyEmail, setNotifyEmail] = useState(true)
   const [notifyPush, setNotifyPush] = useState(true)
   const [currentPwd, setCurrentPwd] = useState('')
@@ -30,6 +30,8 @@ export default function ProfilePage() {
     fetch('/api/profile').then(r => r.json()).then((p: Profile) => {
       setProfile(p)
       setFullName(p.fullName)
+      setUsername(p.username)
+      setEmail(p.email)
       setNotifyEmail(p.notifyEmail)
       setNotifyPush(p.notifyPush)
     })
@@ -38,7 +40,7 @@ export default function ProfilePage() {
   async function save() {
     setError(''); setSaving(true)
     try {
-      const body: Record<string, unknown> = { fullName, notifyEmail, notifyPush }
+      const body: Record<string, unknown> = { fullName, username, email, notifyEmail, notifyPush }
       if (currentPwd && newPwd) { body.currentPassword = currentPwd; body.newPassword = newPwd }
       const res = await fetch('/api/profile', {
         method: 'PATCH',
@@ -134,8 +136,12 @@ export default function ProfilePage() {
               <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} />
             </div>
             <div>
+              <label className="block text-xs font-medium text-navy/50 mb-1.5">{"Nom d'utilisateur"}</label>
+              <input type="text" value={username} onChange={e => setUsername(e.target.value.toLowerCase())} placeholder="sara" />
+            </div>
+            <div>
               <label className="block text-xs font-medium text-navy/50 mb-1.5">Email</label>
-              <input type="email" value={profile.email} disabled style={{ opacity: 0.5 }} />
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="sara@agence.ma" />
             </div>
           </div>
         </motion.div>

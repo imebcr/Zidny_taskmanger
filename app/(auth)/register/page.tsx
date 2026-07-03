@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -56,8 +56,8 @@ export default function RegisterPage() {
         <div className="inline-flex items-center justify-center mb-4">
           <ZidnyIcon size={80} className="rounded-2xl shadow-sm" />
         </div>
-        <h1 className="text-2xl font-bold text-navy">CrÃ©er un compte</h1>
-        <p className="text-navy/45 text-sm mt-1">Rejoignez l&apos;espace Zidny de votre Ã©quipe</p>
+        <h1 className="text-2xl font-bold text-navy">Créer un compte</h1>
+        <p className="text-navy/45 text-sm mt-1">Rejoignez l&apos;espace Zidny de votre équipe</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -75,12 +75,12 @@ export default function RegisterPage() {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-navy/50 mb-1.5">DÃ©partement</label>
+          <label className="block text-xs font-medium text-navy/50 mb-1.5">Département</label>
           <GlassSelect
             value={form.department}
             onChange={v => setForm(f => ({ ...f, department: v }))}
             options={DEPARTMENTS.map(({ value, label }) => ({ value, label }))}
-            placeholder="Choisir votre dÃ©partementâ€¦"
+            placeholder="Choisir votre département…"
           />
         </div>
 
@@ -91,7 +91,7 @@ export default function RegisterPage() {
               type={showPwd ? 'text' : 'password'}
               value={form.password}
               onChange={set('password')}
-              placeholder="Minimum 8 caractÃ¨res"
+              placeholder="Minimum 8 caractères"
               required
               style={{ paddingRight: '2.5rem' }}
             />
@@ -106,7 +106,7 @@ export default function RegisterPage() {
         </div>
         <div>
           <label className="block text-xs font-medium text-navy/50 mb-1.5">Confirmer le mot de passe</label>
-          <input type="password" value={form.confirmPassword} onChange={set('confirmPassword')} placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required />
+          <input type="password" value={form.confirmPassword} onChange={set('confirmPassword')} placeholder="••••••••" required />
         </div>
 
         {error && (
@@ -124,12 +124,12 @@ export default function RegisterPage() {
           disabled={loading}
           className="w-full bg-brand hover:bg-ocean text-white font-semibold rounded-xl py-2.5 shadow-sm shadow-brand/25 transition-colors disabled:opacity-60"
         >
-          {loading ? 'CrÃ©ationâ€¦' : 'CrÃ©er mon compte'}
+          {loading ? 'Création…' : 'Créer mon compte'}
         </button>
       </form>
 
       <p className="text-center text-sm text-navy/45 mt-6">
-        DÃ©jÃ  un compte ?{' '}
+        Déjà un compte ?{' '}
         <Link href="/login" className="text-brand hover:text-ocean font-semibold transition-colors">
           Se connecter
         </Link>
@@ -137,4 +137,3 @@ export default function RegisterPage() {
     </motion.div>
   )
 }
-
