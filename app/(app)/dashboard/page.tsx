@@ -45,6 +45,8 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchTasks()
     fetch('/api/users').then(r => r.json()).then(setUsers)
+    const interval = setInterval(fetchTasks, 30000)
+    return () => clearInterval(interval)
   }, [fetchTasks])
 
   const filtered = tasks.filter(t => {
@@ -91,13 +93,22 @@ export default function DashboardPage() {
             </h1>
             <p className="text-navy/45 text-sm mt-0.5">Vos tâches du jour</p>
           </div>
-          <button
-            onClick={() => setModalOpen(true)}
-            className="flex items-center gap-2 bg-brand hover:bg-ocean text-white font-semibold rounded-xl px-4 py-2 shadow-sm shadow-brand/25 transition-colors text-sm"
-          >
-            <Plus size={16} />
-            Nouvelle tâche
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={fetchTasks}
+              className="p-2 glass-sm rounded-xl text-navy/40 hover:text-brand transition-colors"
+              title="Actualiser"
+            >
+              <RefreshCw size={16} />
+            </button>
+            <button
+              onClick={() => setModalOpen(true)}
+              className="flex items-center gap-2 bg-brand hover:bg-ocean text-white font-semibold rounded-xl px-4 py-2 shadow-sm shadow-brand/25 transition-colors text-sm"
+            >
+              <Plus size={16} />
+              Nouvelle tâche
+            </button>
+          </div>
         </div>
       </div>
 
