@@ -52,21 +52,41 @@ export default function ProfilePage() {
     } finally { setSaving(false) }
   }
 
+  const [pushStatus, setPushStatus] = useState<'idle' | 'loading' | 'done' | 'error' | 'denied'>('idle')
+
   async function subscribePush() {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
-    const reg = await navigator.serviceWorker.ready
-    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-    if (!vapidKey) return
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidKey),
-    })
-    await fetch('/api/push/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sub),
-    })
-    alert('Notifications push activées !')
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      setPushStatus('error')
+      return
+    }
+    setPushStatus('loading')
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') {
+        setPushStatus('denied')
+        return
+      }
+      const reg = await navigator.serviceWorker.ready
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      if (!vapidKey) { setPushStatus('error'); return }
+
+      let sub = await reg.pushManager.getSubscription()
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey),
+        })
+      }
+      const res = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sub),
+      })
+      setPushStatus(res.ok ? 'done' : 'error')
+    } catch (err) {
+      console.error('Push subscription error:', err)
+      setPushStatus('error')
+    }
   }
 
   function urlBase64ToUint8Array(base64String: string) {
@@ -158,9 +178,15 @@ export default function ProfilePage() {
             {notifyPush && (
               <button
                 onClick={subscribePush}
-                className="text-sm text-brand hover:text-ocean font-semibold transition-colors"
+                disabled={pushStatus === 'loading' || pushStatus === 'done'}
+                className="text-sm font-semibold transition-colors disabled:opacity-60
+                  text-brand hover:text-ocean"
               >
-                Activer les notifications push dans ce navigateur →
+                {pushStatus === 'loading' && 'Activation…'}
+                {pushStatus === 'done' && '✓ Notifications activées dans ce navigateur'}
+                {pushStatus === 'denied' && '⚠ Permission refusée — autorisez dans les paramètres du navigateur'}
+                {pushStatus === 'error' && '✗ Erreur — réessayez ou vérifiez la console'}
+                {pushStatus === 'idle' && 'Activer les notifications push dans ce navigateur →'}
               </button>
             )}
           </div>
