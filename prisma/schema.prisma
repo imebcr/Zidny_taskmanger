@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  fullName     String
+  username     String    @unique
+  email        String    @unique
+  passwordHash String
+  role         String    @default("MEMBER")
+  department   String    @default("")
+  isActive     Boolean   @default(true)
+  notifyEmail  Boolean   @default(true)
+  notifyPush   Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  lastLogin    DateTime?
+
+  createdTasks      Task[]               @relation("CreatedTasks")
+  assignedTasks     TaskAssignee[]
+  comments          Comment[]
+  notifications     Notification[]
+  pushSubscriptions PushSubscription[]
+  resetTokens       PasswordResetToken[]
+}
+
+model Task {
+  id             String    @id @default(uuid())
+  title          String
+  description    String?
+  deadline       DateTime
+  status         String    @default("TODO")
+  priority       String    @default("NORMAL")
+  departmentTags String    @default("[]")
+  createdById    String
+  createdBy      User      @relation("CreatedTasks", fields: [createdById], references: [id])
+  createdAt      DateTime  @default(now())
+  completedAt    DateTime?
+  recurrence     String    @default("NONE")
+  parentTaskId   String?
+  parentTask     Task?     @relation("RecurringInstances", fields: [parentTaskId], references: [id])
+
+  recurringInstances Task[]           @relation("RecurringInstances")
+  assignees          TaskAssignee[]
+  subtasks           Subtask[]
+  comments           Comment[]
+  notifications      Notification[]
+  blockingOn         TaskDependency[] @relation("BlockedTask")
+  blockedTasks       TaskDependency[] @relation("BlockingTask")
+}
+
+model TaskDependency {
+  id             String @id @default(uuid())
+  blockedTaskId  String
+  blockedTask    Task   @relation("BlockedTask", fields: [blockedTaskId], references: [id])
+  blockingTaskId String
+  blockingTask   Task   @relation("BlockingTask", fields: [blockingTaskId], references: [id])
+
+  @@unique([blockedTaskId, blockingTaskId])
+}
+
+model TaskAssignee {
+  taskId String
+  userId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, userId])
+}
+
+model Subtask {
+  id          String  @id @default(uuid())
+  taskId      String
+  task        Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title       String
+  isCompleted Boolean @default(false)
+  order       Int     @default(0)
+}
+
+model Comment {
+  id               String   @id @default(uuid())
+  taskId           String
+  task             Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  content          String
+  createdAt        DateTime @default(now())
+  isSystemLog      Boolean  @default(false)
+  mentionedUserIds String   @default("[]")
+}
+
+model Notification {
+  id      String   @id @default(uuid())
+  userId  String
+  user    User     @relation(fields: [userId], references: [id])
+  taskId  String?
+  task    Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  type    String
+  channel String
+  isRead  Boolean  @default(false)
+  sentAt  DateTime @default(now())
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+}

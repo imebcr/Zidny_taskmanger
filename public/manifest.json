@@ -1,0 +1,16 @@
+{
+  "name": "Zidny — Gestionnaire de tâches",
+  "short_name": "Zidny",
+  "description": "Plateforme de gestion de tâches pour votre équipe",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#E9FCFF",
+  "theme_color": "#2AA4E7",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/zidny-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/zidny-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "categories": ["productivity", "business"],
+  "lang": "fr"
+}
