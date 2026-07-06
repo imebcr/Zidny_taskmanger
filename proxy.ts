@@ -13,6 +13,7 @@ export async function proxy(request: NextRequest) {
     || pathname.startsWith('/api/forgot-password')
     || pathname.startsWith('/api/reset-password')
     || pathname.startsWith('/api/push')
+    || pathname.startsWith('/api/cron')
     || pathname.startsWith('/_next')
     || pathname === '/favicon.ico'
     || pathname === '/manifest.json'
