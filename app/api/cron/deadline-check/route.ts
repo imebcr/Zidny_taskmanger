@@ -8,8 +8,8 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
 function isAuthorized(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
-  if (!secret) return true // open in dev when no secret is set
-  return request.headers.get('authorization') === `Bearer ${secret}`
+  if (!secret) return true
+  return request.headers.get('x-cron-secret') === secret
 }
 
 async function handler(request: NextRequest) {
