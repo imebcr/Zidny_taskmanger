@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useSession } from 'next-auth/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
@@ -74,6 +75,7 @@ export default function TaskCard({ task: initialTask, compact }: TaskCardProps) 
   }
 
   return (
+    <>
     <motion.div
       whileHover={{ y: -4, scale: 1.015 }}
       transition={{ type: 'spring' as const, stiffness: 500, damping: 28 }}
@@ -196,13 +198,13 @@ export default function TaskCard({ task: initialTask, compact }: TaskCardProps) 
         </div>
       )}
 
-      {/* Done confirmation modal */}
+    </motion.div>
+
+    {/* Portal: renders at document.body to escape card's transform stacking context */}
+    {typeof document !== 'undefined' && createPortal(
       <AnimatePresence>
         {showDoneConfirm && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            onClick={e => e.stopPropagation()}
-          >
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -249,7 +251,9 @@ export default function TaskCard({ task: initialTask, compact }: TaskCardProps) 
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
-    </motion.div>
+      </AnimatePresence>,
+      document.body
+    )}
+    </>
   )
 }
