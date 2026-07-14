@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import { motion } from 'framer-motion'
-import { Plus, Clock, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Plus, Clock, CheckCircle2, AlertCircle, RefreshCw, Check, ChevronDown } from 'lucide-react'
 import { format, isPast, isWithinInterval, addHours } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import TaskCard from '@/components/TaskCard'
@@ -24,7 +24,6 @@ const FILTER_CHIPS = [
   { key: 'soon', label: 'Bientôt' },
   { key: 'IN_PROGRESS', label: 'En cours' },
   { key: 'TODO', label: 'À faire' },
-  { key: 'DONE', label: 'Terminées' },
 ]
 
 export default function DashboardPage() {
@@ -34,6 +33,7 @@ export default function DashboardPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [users, setUsers] = useState<{ id: string; fullName: string; username: string }[]>([])
   const [loading, setLoading] = useState(true)
+  const [showDone, setShowDone] = useState(false)
 
   const fetchTasks = useCallback(async () => {
     setLoading(true)
@@ -49,11 +49,14 @@ export default function DashboardPage() {
     return () => clearInterval(interval)
   }, [fetchTasks])
 
-  const filtered = tasks.filter(t => {
+  const activeTasks = tasks.filter(t => t.status !== 'DONE')
+  const doneTasks = tasks.filter(t => t.status === 'DONE')
+
+  const filteredActive = activeTasks.filter(t => {
     if (!filter) return true
     if (filter === 'soon') {
       const d = new Date(t.deadline)
-      return !isPast(d) && isWithinInterval(d, { start: new Date(), end: addHours(new Date(), 48) }) && t.status !== 'DONE'
+      return !isPast(d) && isWithinInterval(d, { start: new Date(), end: addHours(new Date(), 48) })
     }
     return t.status === filter
   })
@@ -61,19 +64,15 @@ export default function DashboardPage() {
   const stats = {
     overdue: tasks.filter(t => t.status === 'OVERDUE').length,
     inProgress: tasks.filter(t => t.status === 'IN_PROGRESS').length,
-    done: tasks.filter(t => t.status === 'DONE').length,
+    done: doneTasks.length,
     total: tasks.length,
   }
 
   async function createTask(data: Record<string, unknown>) {
-    const isAdmin = session?.user.role === 'ADMIN'
     const res = await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...data,
-        assigneeIds: isAdmin ? (data.assigneeIds || []) : [session?.user.id],
-      }),
+      body: JSON.stringify(data),
     })
     if (!res.ok) throw new Error('Erreur')
     await fetchTasks()
@@ -151,14 +150,14 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Task list */}
+        {/* Active task list */}
         {loading ? (
           <div className="text-center py-16 text-navy/40">Chargement…</div>
-        ) : filtered.length === 0 ? (
+        ) : filteredActive.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-center py-16"
+            className="text-center py-12"
           >
             <div className="text-5xl mb-4">🎉</div>
             <p className="text-navy font-semibold">Aucune tâche ici</p>
@@ -173,7 +172,7 @@ export default function DashboardPage() {
             animate="show"
             className="space-y-3"
           >
-            {filtered.map(task => (
+            {filteredActive.map(task => (
               <motion.div key={task.id} variants={item}>
                 <TaskCard task={task} />
               </motion.div>
@@ -181,13 +180,60 @@ export default function DashboardPage() {
           </motion.div>
         )}
 
+        {/* Done tasks checklist */}
+        {doneTasks.length > 0 && (
+          <div>
+            <button
+              onClick={() => setShowDone(v => !v)}
+              className="flex items-center gap-2 text-navy/50 hover:text-navy text-sm font-semibold transition-colors mb-3"
+            >
+              <div className="flex items-center justify-center w-5 h-5 rounded-full bg-green-100">
+                <Check size={11} className="text-green-600" />
+              </div>
+              Terminées ({doneTasks.length})
+              <motion.div animate={{ rotate: showDone ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                <ChevronDown size={16} />
+              </motion.div>
+            </button>
+            <AnimatePresence>
+              {showDone && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.22 }}
+                  className="overflow-hidden"
+                >
+                  <div className="space-y-2 pl-1">
+                    {doneTasks.map(task => (
+                      <motion.div
+                        key={task.id}
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="flex items-center gap-3 glass-sm rounded-xl px-4 py-2.5 cursor-pointer hover:bg-white/30 transition-colors"
+                        onClick={() => window.location.href = `/tasks/${task.id}`}
+                      >
+                        <CheckCircle2 size={15} className="text-green-500 shrink-0" />
+                        <span className="text-navy/40 text-sm line-through line-clamp-1 flex-1">{task.title}</span>
+                        <span className="text-navy/25 text-xs shrink-0">
+                          {format(new Date(task.deadline), 'dd MMM', { locale: fr })}
+                        </span>
+                      </motion.div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
         {/* Personal timeline */}
-        {tasks.length > 0 && !filter && (
+        {activeTasks.length > 0 && !filter && (
           <div>
             <h2 className="text-navy font-bold text-base mb-4 mt-6">Chronologie personnelle</h2>
             <div className="relative pl-5">
               <div className="absolute left-2 top-0 bottom-0 w-0.5 bg-gradient-to-b from-brand/40 to-transparent" />
-              {tasks.filter(t => t.status !== 'DONE').slice(0, 10).map((task, i) => {
+              {activeTasks.slice(0, 10).map((task, i) => {
                 const d = new Date(task.deadline)
                 const isLate = isPast(d)
                 return (

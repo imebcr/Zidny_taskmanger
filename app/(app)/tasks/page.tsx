@@ -58,7 +58,10 @@ export default function TeamTasksPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
-    if (!res.ok) throw new Error('Erreur')
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error || 'Erreur')
+    }
     await fetchTasks()
   }
 
@@ -73,15 +76,13 @@ export default function TeamTasksPage() {
             <h1 className="text-navy font-bold text-xl">Tâches de l&apos;équipe</h1>
             <p className="text-navy/45 text-sm mt-0.5">{tasks.length} tâche{tasks.length !== 1 ? 's' : ''} au total</p>
           </div>
-          {session?.user.role === 'ADMIN' && (
-            <button
-              onClick={() => setModalOpen(true)}
-              className="flex items-center gap-2 bg-brand hover:bg-ocean text-white font-semibold rounded-xl px-4 py-2 shadow-sm shadow-brand/25 transition-colors text-sm"
-            >
-              <Plus size={16} />
-              Nouvelle tâche
-            </button>
-          )}
+          <button
+            onClick={() => setModalOpen(true)}
+            className="flex items-center gap-2 bg-brand hover:bg-ocean text-white font-semibold rounded-xl px-4 py-2 shadow-sm shadow-brand/25 transition-colors text-sm"
+          >
+            <Plus size={16} />
+            Nouvelle tâche
+          </button>
         </div>
       </div>
 

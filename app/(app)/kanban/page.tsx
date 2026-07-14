@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { motion } from 'framer-motion'
-import { Plus } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   DndContext, DragEndEvent, DragOverlay, DragStartEvent,
   PointerSensor, useSensor, useSensors, closestCenter,
@@ -34,12 +34,27 @@ const COLUMNS: { id: string; label: string; color: string }[] = [
   { id: 'DONE', label: 'Terminé', color: 'bg-green-50 border-green-200' },
 ]
 
-function KanbanCard({ task, isDragging }: { task: Task; isDragging?: boolean }) {
+// Allowed manual move order (OVERDUE handled separately)
+const MOVE_ORDER = ['TODO', 'IN_PROGRESS', 'DONE']
+
+function KanbanCard({
+  task,
+  isDragging,
+  onMove,
+}: {
+  task: Task
+  isDragging?: boolean
+  onMove: (taskId: string, newStatus: string) => void
+}) {
   const router = useRouter()
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task.id })
   const deadline = new Date(task.deadline)
   const isLate = isPast(deadline) && task.status !== 'DONE'
   const doneSubtasks = task.subtasks.filter(s => s.isCompleted).length
+
+  const currentIdx = task.status === 'OVERDUE' ? 1 : MOVE_ORDER.indexOf(task.status)
+  const prevStatus = task.status === 'OVERDUE' ? 'IN_PROGRESS' : (currentIdx > 0 ? MOVE_ORDER[currentIdx - 1] : null)
+  const nextStatus = task.status === 'OVERDUE' ? 'DONE' : (currentIdx < MOVE_ORDER.length - 1 ? MOVE_ORDER[currentIdx + 1] : null)
 
   return (
     <div
@@ -69,6 +84,33 @@ function KanbanCard({ task, isDragging }: { task: Task; isDragging?: boolean }) 
         </div>
         <span className="text-[10px] text-navy/30">{task._count.comments > 0 && `💬 ${task._count.comments}`}</span>
       </div>
+
+      {/* Arrow buttons to move between states */}
+      <div
+        className="flex items-center justify-between mt-2 pt-2 border-t border-white/30"
+        onClick={e => e.stopPropagation()}
+      >
+        {prevStatus ? (
+          <button
+            onClick={e => { e.stopPropagation(); onMove(task.id, prevStatus) }}
+            title={`← ${COLUMNS.find(c => c.id === prevStatus)?.label}`}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-navy/40 hover:text-navy hover:bg-white/60 transition-colors text-[10px] font-semibold"
+          >
+            <ChevronLeft size={13} />
+            {COLUMNS.find(c => c.id === prevStatus)?.label}
+          </button>
+        ) : <div />}
+        {nextStatus ? (
+          <button
+            onClick={e => { e.stopPropagation(); onMove(task.id, nextStatus) }}
+            title={`${COLUMNS.find(c => c.id === nextStatus)?.label} →`}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-navy/40 hover:text-navy hover:bg-white/60 transition-colors text-[10px] font-semibold"
+          >
+            {COLUMNS.find(c => c.id === nextStatus)?.label}
+            <ChevronRight size={13} />
+          </button>
+        ) : <div />}
+      </div>
     </div>
   )
 }
@@ -83,10 +125,9 @@ export default function KanbanPage() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   const fetchTasks = useCallback(async () => {
-    const url = session?.user.role === 'ADMIN' ? '/api/tasks' : '/api/tasks?mine=true'
-    const res = await fetch(url)
+    const res = await fetch('/api/tasks')
     if (res.ok) setTasks(await res.json())
-  }, [session?.user.role])
+  }, [])
 
   useEffect(() => {
     fetchTasks()
@@ -97,6 +138,15 @@ export default function KanbanPage() {
     setActiveId(String(event.active.id))
   }
 
+  async function moveTask(taskId: string, newStatus: string) {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t))
+    await fetch(`/api/tasks/${taskId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+    })
+  }
+
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     setActiveId(null)
@@ -105,26 +155,14 @@ export default function KanbanPage() {
     const draggedTask = tasks.find(t => t.id === active.id)
     if (!draggedTask) return
 
-    // Check if dropped on a column header
     const targetColumn = COLUMNS.find(c => c.id === over.id)
     if (targetColumn) {
       if (draggedTask.status === targetColumn.id) return
-      setTasks(prev => prev.map(t => t.id === active.id ? { ...t, status: targetColumn.id } : t))
-      await fetch(`/api/tasks/${active.id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: targetColumn.id }),
-      })
+      await moveTask(String(active.id), targetColumn.id)
     } else {
-      // Dropped on another card — find which column the target is in
       const targetTask = tasks.find(t => t.id === over.id)
       if (targetTask && draggedTask.status !== targetTask.status) {
-        setTasks(prev => prev.map(t => t.id === active.id ? { ...t, status: targetTask.status } : t))
-        await fetch(`/api/tasks/${active.id}/status`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: targetTask.status }),
-        })
+        await moveTask(String(active.id), targetTask.status)
       }
     }
   }
@@ -149,15 +187,13 @@ export default function KanbanPage() {
           <h1 className="text-navy font-bold text-xl">Kanban</h1>
           <p className="text-navy/45 text-sm mt-0.5">{tasks.length} tâches</p>
         </div>
-        {session?.user.role === 'ADMIN' && (
-          <button
-            onClick={() => setModalOpen(true)}
-            className="flex items-center gap-2 bg-brand hover:bg-ocean text-white font-semibold rounded-xl px-4 py-2 shadow-sm shadow-brand/25 transition-colors text-sm"
-          >
-            <Plus size={16} />
-            Nouvelle tâche
-          </button>
-        )}
+        <button
+          onClick={() => setModalOpen(true)}
+          className="flex items-center gap-2 bg-brand hover:bg-ocean text-white font-semibold rounded-xl px-4 py-2 shadow-sm shadow-brand/25 transition-colors text-sm"
+        >
+          <Plus size={16} />
+          Nouvelle tâche
+        </button>
       </div>
 
       {/* Board */}
@@ -173,7 +209,6 @@ export default function KanbanPage() {
               const colTasks = tasks.filter(t => t.status === col.id)
               return (
                 <div key={col.id} className={`flex flex-col w-72 rounded-2xl border ${col.color} overflow-hidden`}>
-                  {/* Column header — also a drop target */}
                   <SortableContext items={[col.id]} strategy={verticalListSortingStrategy}>
                     <div className="px-4 py-3 border-b border-inherit">
                       <div className="flex items-center justify-between">
@@ -185,12 +220,11 @@ export default function KanbanPage() {
                     </div>
                   </SortableContext>
 
-                  {/* Cards */}
                   <div className="flex-1 overflow-y-auto p-3 space-y-3">
                     <SortableContext items={colTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                       {colTasks.map(task => (
                         <motion.div key={task.id} layout>
-                          <KanbanCard task={task} isDragging={task.id === activeId} />
+                          <KanbanCard task={task} isDragging={task.id === activeId} onMove={moveTask} />
                         </motion.div>
                       ))}
                     </SortableContext>

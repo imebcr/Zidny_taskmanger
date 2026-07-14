@@ -4,7 +4,9 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { sendEmail, taskAssignedEmail } from '@/lib/email'
 import { sendPushToUser } from '@/lib/push'
- 
+
+const ELEVATED_DEPTS = ['RH', 'COO', 'CEO']
+
 const createSchema = z.object({
   title: z.string().min(1, 'Le titre est requis'),
   description: z.string().optional(),
@@ -17,11 +19,11 @@ const createSchema = z.object({
   parentTaskId: z.string().optional(),
   blockedByIds: z.array(z.string()).optional(),
 })
- 
+
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
- 
+
   const { searchParams } = new URL(req.url)
   const mine = searchParams.get('mine') === 'true'
   const status = searchParams.get('status')
@@ -30,15 +32,37 @@ export async function GET(req: NextRequest) {
   const assigneeId = searchParams.get('assigneeId')
   const search = searchParams.get('search')
   const deadline = searchParams.get('deadline')
- 
+
+  // Resolve visibility scope
+  const currentUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { department: true },
+  })
+  const isElevated = session.user.role === 'ADMIN' || ELEVATED_DEPTS.includes(currentUser?.department ?? '')
+
   const where: Record<string, unknown> = {}
- 
+
   if (mine) {
     where.assignees = { some: { userId: session.user.id } }
+  } else if (!isElevated) {
+    // Non-elevated members: see only tasks where an assignee is in their department
+    const deptUsers = currentUser?.department
+      ? await prisma.user.findMany({
+          where: { department: currentUser.department, isActive: true },
+          select: { id: true },
+        })
+      : [{ id: session.user.id }]
+    const deptUserIds = deptUsers.map(u => u.id)
+    if (assigneeId) {
+      if (!deptUserIds.includes(assigneeId)) return NextResponse.json([])
+      where.assignees = { some: { userId: assigneeId } }
+    } else {
+      where.assignees = { some: { userId: { in: deptUserIds } } }
+    }
   } else if (assigneeId) {
     where.assignees = { some: { userId: assigneeId } }
   }
- 
+
   if (status) where.status = status
   if (priority) where.priority = priority
   if (department) where.departmentTags = { contains: department }
@@ -48,7 +72,7 @@ export async function GET(req: NextRequest) {
       { description: { contains: search, mode: 'insensitive' } },
     ]
   }
- 
+
   if (deadline === 'today') {
     const end = new Date(); end.setHours(23, 59, 59, 999)
     where.deadline = { lte: end }
@@ -59,7 +83,7 @@ export async function GET(req: NextRequest) {
     const end = new Date(); end.setDate(end.getDate() + 30)
     where.deadline = { lte: end }
   }
- 
+
   const tasks = await prisma.task.findMany({
     where,
     include: {
@@ -69,30 +93,29 @@ export async function GET(req: NextRequest) {
       _count: { select: { comments: true } },
       blockingOn: { include: { blockingTask: { select: { id: true, title: true, status: true } } } },
     },
-    orderBy: { deadline: 'asc' },
+    orderBy: { createdAt: 'desc' },
   })
- 
+
   return NextResponse.json(tasks)
 }
- 
+
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
- 
+
   try {
     const body = await req.json()
     const data = createSchema.parse(body)
- 
-    const assigneeIds = session.user.role === 'ADMIN'
-      ? (data.assigneeIds ?? [])
-      : [session.user.id]
- 
+
+    // Any user can assign; default to self if no assignees specified
+    const assigneeIds = data.assigneeIds?.length ? data.assigneeIds : [session.user.id]
+
     const creator = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { department: true },
     })
     const deptTags = creator?.department ? [creator.department] : []
- 
+
     const task = await prisma.task.create({
       data: {
         title: data.title,
@@ -113,13 +136,12 @@ export async function POST(req: NextRequest) {
       },
       include: {
         createdBy: { select: { id: true, fullName: true, username: true } },
-        assignees: { include: { user: { select: { id: true, fullName: true, username: true, email: true, notifyPush: true } } } },
+        assignees: { include: { user: { select: { id: true, fullName: true, username: true, email: true, notifyEmail: true, notifyPush: true } } } },
         subtasks: true,
         _count: { select: { comments: true } },
       },
     })
- 
-    // System log
+
     await prisma.comment.create({
       data: {
         taskId: task.id,
@@ -128,34 +150,32 @@ export async function POST(req: NextRequest) {
         isSystemLog: true,
       },
     })
- 
-    // Notify assignees — only when an admin creates and assigns the task
-    if (session.user.role === 'ADMIN') {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-      for (const assignee of task.assignees) {
-        if (assignee.user.id === session.user.id) continue // don't notify the admin themselves
-        if (assignee.user.email) {
-          const { subject, html } = taskAssignedEmail(
-            assignee.user.fullName,
-            task.title,
-            task.deadline,
-            appUrl,
-            task.id
-          )
-          sendEmail({ to: assignee.user.email, subject, html }).catch(err =>
-            console.error('Failed to send task-assigned email:', err)
-          )
-        }
-        if (assignee.user.notifyPush) {
-          sendPushToUser(assignee.user.id, {
-            title: 'Nouvelle tâche assignée 📋',
-            body: task.title,
-            url: `/tasks/${task.id}`,
-          }).catch(console.error)
-        }
+
+    // Notify assignees who are not the creator
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    for (const assignee of task.assignees) {
+      if (assignee.user.id === session.user.id) continue
+      if (assignee.user.email) {
+        const { subject, html } = taskAssignedEmail(
+          assignee.user.fullName,
+          task.title,
+          task.deadline,
+          appUrl,
+          task.id
+        )
+        sendEmail({ to: assignee.user.email, subject, html }).catch(err =>
+          console.error('Failed to send task-assigned email:', err)
+        )
+      }
+      if (assignee.user.notifyPush) {
+        sendPushToUser(assignee.user.id, {
+          title: 'Nouvelle tâche assignée 📋',
+          body: task.title,
+          url: `/tasks/${task.id}`,
+        }).catch(console.error)
       }
     }
- 
+
     return NextResponse.json(task, { status: 201 })
   } catch (err) {
     if (err instanceof z.ZodError) {

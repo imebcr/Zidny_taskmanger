@@ -152,7 +152,7 @@ export default function TaskModal({ open, onClose, onSave, initialData, isAdmin,
                 </div>
               </div>
 
-              {isAdmin && users.length > 0 && (
+              {users.length > 0 && (
                 <div>
                   <label className="block text-xs font-medium text-navy/50 mb-2">Assigné(s) à</label>
                   <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">

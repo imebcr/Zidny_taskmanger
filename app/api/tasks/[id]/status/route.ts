@@ -16,7 +16,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!isAdmin && !isAssignee && task.createdById !== session.user.id) {
     return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
   }
-  if (!isAdmin && !['IN_PROGRESS', 'DONE'].includes(status)) {
+  if (!isAdmin && !['TODO', 'IN_PROGRESS', 'DONE'].includes(status)) {
     return NextResponse.json({ error: 'Action non autorisée' }, { status: 403 })
   }
 

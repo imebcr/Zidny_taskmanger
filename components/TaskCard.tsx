@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import { Clock, MessageSquare, CheckSquare, AlertCircle, RefreshCw, Check } from 'lucide-react'
+import { Clock, MessageSquare, CheckSquare, AlertCircle, RefreshCw, Check, Play } from 'lucide-react'
 import { formatDistanceToNow, isPast, isWithinInterval, addHours } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import StatusBadge from './StatusBadge'
@@ -41,8 +41,21 @@ export default function TaskCard({ task: initialTask, compact }: TaskCardProps) 
   const totalSubtasks = initialTask.subtasks.length
   const isBlocked = initialTask.blockingOn?.some(d => d.blockingTask.status !== 'DONE')
 
+  const isAdmin = session?.user.role === 'ADMIN'
   const isAssignee = initialTask.assignees.some(a => a.user.id === session?.user.id)
-  const canMarkDone = isAssignee && status !== 'DONE'
+  const canAct = isAssignee || isAdmin
+  const canStart = canAct && status === 'TODO'
+  const canComplete = canAct && status === 'IN_PROGRESS'
+
+  async function markInProgress(e: React.MouseEvent) {
+    e.stopPropagation()
+    const res = await fetch(`/api/tasks/${initialTask.id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'IN_PROGRESS' }),
+    })
+    if (res.ok) setStatus('IN_PROGRESS')
+  }
 
   async function markDone(e: React.MouseEvent) {
     e.stopPropagation()
@@ -127,12 +140,44 @@ export default function TaskCard({ task: initialTask, compact }: TaskCardProps) 
               </div>
             )}
           </div>
+          {/* Quick action icon buttons — always visible */}
+          {canStart && (
+            <button
+              onClick={markInProgress}
+              title="Démarrer"
+              className="w-6 h-6 rounded-full bg-brand/10 text-brand flex items-center justify-center hover:bg-brand hover:text-white transition-colors shrink-0"
+            >
+              <Play size={10} />
+            </button>
+          )}
+          {canComplete && (
+            <button
+              onClick={markDone}
+              title="Marquer terminée"
+              className="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center hover:bg-green-500 hover:text-white transition-colors shrink-0"
+            >
+              <Check size={10} />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Quick "Mark as Done" — slides in on hover for assignees */}
-      {canMarkDone && (
-        <div className="max-h-0 group-hover:max-h-12 overflow-hidden transition-all duration-200">
+      {/* Mobile: full-width "Terminée" button for IN_PROGRESS tasks */}
+      {canComplete && (
+        <div className="mt-2 pt-2 border-t border-white/40 lg:hidden">
+          <button
+            onClick={markDone}
+            className="w-full flex items-center justify-center gap-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-xl py-1.5 transition-colors"
+          >
+            <Check size={12} />
+            Marquer comme terminée
+          </button>
+        </div>
+      )}
+
+      {/* Desktop: full-width button on hover */}
+      {canComplete && (
+        <div className="max-h-0 group-hover:max-h-12 overflow-hidden transition-all duration-200 hidden lg:block">
           <div className="pt-2 mt-2 border-t border-white/40">
             <button
               onClick={markDone}
