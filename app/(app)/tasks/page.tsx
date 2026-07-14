@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import { motion } from 'framer-motion'
-import { Plus, Search, Filter, X } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Plus, Search, Filter, X, Check, CheckCircle2, ChevronDown } from 'lucide-react'
+import { format } from 'date-fns'
+import { fr } from 'date-fns/locale'
 import TaskCard from '@/components/TaskCard'
 import TaskModal from '@/components/TaskModal'
 import { DEPARTMENTS, STATUS_LABELS, PRIORITY_LABELS } from '@/lib/types'
@@ -31,6 +33,7 @@ export default function TeamTasksPage() {
     status: '', priority: '', department: '', assigneeId: '', deadline: '',
   })
   const [showFilters, setShowFilters] = useState(false)
+  const [showDone, setShowDone] = useState(false)
 
   const fetchTasks = useCallback(async () => {
     setLoading(true)
@@ -171,29 +174,84 @@ export default function TeamTasksPage() {
           </motion.div>
         )}
 
-        {/* Task grid */}
+        {/* Task grid — active tasks only */}
         {loading ? (
           <div className="text-center py-16 text-navy/40">Chargement…</div>
-        ) : tasks.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="text-5xl mb-4">📭</div>
-            <p className="text-navy font-semibold">Aucune tâche trouvée</p>
-            <p className="text-navy/45 text-sm mt-1">Essayez de modifier vos filtres.</p>
-          </div>
-        ) : (
-          <motion.div
-            variants={container}
-            initial="hidden"
-            animate="show"
-            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
-          >
-            {tasks.map(task => (
-              <motion.div key={task.id} variants={item}>
-                <TaskCard task={task} />
-              </motion.div>
-            ))}
-          </motion.div>
-        )}
+        ) : (() => {
+          const activeTasks = tasks.filter(t => t.status !== 'DONE')
+          const doneTasks = tasks.filter(t => t.status === 'DONE')
+          return (
+            <>
+              {activeTasks.length === 0 && doneTasks.length === 0 ? (
+                <div className="text-center py-16">
+                  <div className="text-5xl mb-4">📭</div>
+                  <p className="text-navy font-semibold">Aucune tâche trouvée</p>
+                  <p className="text-navy/45 text-sm mt-1">Essayez de modifier vos filtres.</p>
+                </div>
+              ) : activeTasks.length > 0 ? (
+                <motion.div
+                  variants={container}
+                  initial="hidden"
+                  animate="show"
+                  className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+                >
+                  {activeTasks.map(task => (
+                    <motion.div key={task.id} variants={item}>
+                      <TaskCard task={task} />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              ) : null}
+
+              {/* Done tasks checklist */}
+              {doneTasks.length > 0 && (
+                <div className="pt-2">
+                  <button
+                    onClick={() => setShowDone(v => !v)}
+                    className="flex items-center gap-2 text-navy/50 hover:text-navy text-sm font-semibold transition-colors mb-3"
+                  >
+                    <div className="flex items-center justify-center w-5 h-5 rounded-full bg-green-100">
+                      <Check size={11} className="text-green-600" />
+                    </div>
+                    Terminées ({doneTasks.length})
+                    <motion.div animate={{ rotate: showDone ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                      <ChevronDown size={16} />
+                    </motion.div>
+                  </button>
+                  <AnimatePresence>
+                    {showDone && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.22 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 pl-1">
+                          {doneTasks.map(task => (
+                            <motion.div
+                              key={task.id}
+                              initial={{ opacity: 0, x: -8 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              className="flex items-center gap-3 glass-sm rounded-xl px-4 py-2.5 cursor-pointer hover:bg-white/30 transition-colors"
+                              onClick={() => window.location.href = `/tasks/${task.id}`}
+                            >
+                              <CheckCircle2 size={15} className="text-green-500 shrink-0" />
+                              <span className="text-navy/40 text-sm line-through line-clamp-1 flex-1">{task.title}</span>
+                              <span className="text-navy/25 text-xs shrink-0">
+                                {format(new Date(task.deadline), 'dd MMM', { locale: fr })}
+                              </span>
+                            </motion.div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
+            </>
+          )
+        })()}
       </div>
 
       <TaskModal
