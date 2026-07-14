@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import { motion } from 'framer-motion'
-import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Plus, ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import {
   DndContext, DragEndEvent, DragOverlay, DragStartEvent,
   PointerSensor, useSensor, useSensors, closestCenter,
@@ -41,10 +41,12 @@ function KanbanCard({
   task,
   isDragging,
   onMove,
+  onRequestDone,
 }: {
   task: Task
   isDragging?: boolean
   onMove: (taskId: string, newStatus: string) => void
+  onRequestDone: (taskId: string) => void
 }) {
   const router = useRouter()
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task.id })
@@ -102,7 +104,7 @@ function KanbanCard({
         ) : <div />}
         {nextStatus ? (
           <button
-            onClick={e => { e.stopPropagation(); onMove(task.id, nextStatus) }}
+            onClick={e => { e.stopPropagation(); nextStatus === 'DONE' ? onRequestDone(task.id) : onMove(task.id, nextStatus) }}
             title={`${COLUMNS.find(c => c.id === nextStatus)?.label} →`}
             className="flex items-center gap-1 px-2 py-1 rounded-lg text-navy/40 hover:text-navy hover:bg-white/60 transition-colors text-[10px] font-semibold"
           >
@@ -121,6 +123,7 @@ export default function KanbanPage() {
   const [users, setUsers] = useState<{ id: string; fullName: string; username: string }[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [pendingDoneId, setPendingDoneId] = useState<string | null>(null)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
@@ -224,7 +227,7 @@ export default function KanbanPage() {
                     <SortableContext items={colTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                       {colTasks.map(task => (
                         <motion.div key={task.id} layout>
-                          <KanbanCard task={task} isDragging={task.id === activeId} onMove={moveTask} />
+                          <KanbanCard task={task} isDragging={task.id === activeId} onMove={moveTask} onRequestDone={setPendingDoneId} />
                         </motion.div>
                       ))}
                     </SortableContext>
@@ -254,6 +257,63 @@ export default function KanbanPage() {
         users={users}
         isAdmin={session?.user.role === 'ADMIN'}
       />
+
+      {/* Done confirmation modal */}
+      <AnimatePresence>
+        {pendingDoneId && (() => {
+          const task = tasks.find(t => t.id === pendingDoneId)
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setPendingDoneId(null)}
+                className="absolute inset-0 bg-navy/20 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.88, y: 24 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.88, y: 24 }}
+                transition={{ type: 'spring' as const, stiffness: 360, damping: 26 }}
+                className="glass rounded-2xl p-6 max-w-sm w-full relative z-10 text-center"
+                onClick={e => e.stopPropagation()}
+              >
+                <motion.div
+                  initial={{ scale: 0, rotate: -20 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: 'spring' as const, stiffness: 400, damping: 14, delay: 0.08 }}
+                  className="text-5xl mb-3 select-none"
+                >
+                  🎉
+                </motion.div>
+                <h3 className="text-navy font-bold text-lg mb-1">Félicitations !</h3>
+                <p className="text-navy/50 text-sm mb-3">Cette tâche est-elle vraiment terminée ?</p>
+                {task && (
+                  <p className="text-navy text-sm font-semibold line-clamp-2 bg-white/30 rounded-xl px-3 py-2 mb-5">
+                    &ldquo;{task.title}&rdquo;
+                  </p>
+                )}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setPendingDoneId(null)}
+                    className="flex-1 border border-silver text-navy/50 hover:text-navy hover:bg-white/50 rounded-xl py-2.5 text-sm font-semibold transition-all"
+                  >
+                    Non, continuer
+                  </button>
+                  <button
+                    onClick={async () => { await moveTask(pendingDoneId, 'DONE'); setPendingDoneId(null) }}
+                    className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-xl py-2.5 text-sm transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Check size={15} />
+                    Oui, terminée !
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )
+        })()}
+      </AnimatePresence>
     </div>
   )
 }

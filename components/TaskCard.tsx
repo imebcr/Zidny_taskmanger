@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { Clock, MessageSquare, CheckSquare, AlertCircle, RefreshCw, Check, Play } from 'lucide-react'
 import { formatDistanceToNow, isPast, isWithinInterval, addHours } from 'date-fns'
@@ -41,6 +41,8 @@ export default function TaskCard({ task: initialTask, compact }: TaskCardProps) 
   const totalSubtasks = initialTask.subtasks.length
   const isBlocked = initialTask.blockingOn?.some(d => d.blockingTask.status !== 'DONE')
 
+  const [showDoneConfirm, setShowDoneConfirm] = useState(false)
+
   const isAdmin = session?.user.role === 'ADMIN'
   const isAssignee = initialTask.assignees.some(a => a.user.id === session?.user.id)
   const canAct = isAssignee || isAdmin
@@ -57,14 +59,18 @@ export default function TaskCard({ task: initialTask, compact }: TaskCardProps) 
     if (res.ok) setStatus('IN_PROGRESS')
   }
 
-  async function markDone(e: React.MouseEvent) {
+  function requestDone(e: React.MouseEvent) {
     e.stopPropagation()
+    setShowDoneConfirm(true)
+  }
+
+  async function confirmMarkDone() {
     const res = await fetch(`/api/tasks/${initialTask.id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'DONE' }),
     })
-    if (res.ok) setStatus('DONE')
+    if (res.ok) { setStatus('DONE'); setShowDoneConfirm(false) }
   }
 
   return (
@@ -152,7 +158,7 @@ export default function TaskCard({ task: initialTask, compact }: TaskCardProps) 
           )}
           {canComplete && (
             <button
-              onClick={markDone}
+              onClick={requestDone}
               title="Marquer terminée"
               className="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center hover:bg-green-500 hover:text-white transition-colors shrink-0"
             >
@@ -166,7 +172,7 @@ export default function TaskCard({ task: initialTask, compact }: TaskCardProps) 
       {canComplete && (
         <div className="mt-2 pt-2 border-t border-white/40 lg:hidden">
           <button
-            onClick={markDone}
+            onClick={requestDone}
             className="w-full flex items-center justify-center gap-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-xl py-1.5 transition-colors"
           >
             <Check size={12} />
@@ -180,7 +186,7 @@ export default function TaskCard({ task: initialTask, compact }: TaskCardProps) 
         <div className="max-h-0 group-hover:max-h-12 overflow-hidden transition-all duration-200 hidden lg:block">
           <div className="pt-2 mt-2 border-t border-white/40">
             <button
-              onClick={markDone}
+              onClick={requestDone}
               className="w-full flex items-center justify-center gap-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-xl py-1.5 transition-colors"
             >
               <Check size={12} />
@@ -189,6 +195,61 @@ export default function TaskCard({ task: initialTask, compact }: TaskCardProps) 
           </div>
         </div>
       )}
+
+      {/* Done confirmation modal */}
+      <AnimatePresence>
+        {showDoneConfirm && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowDoneConfirm(false)}
+              className="absolute inset-0 bg-navy/20 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.88, y: 24 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.88, y: 24 }}
+              transition={{ type: 'spring' as const, stiffness: 360, damping: 26 }}
+              className="glass rounded-2xl p-6 max-w-sm w-full relative z-10 text-center"
+              onClick={e => e.stopPropagation()}
+            >
+              <motion.div
+                initial={{ scale: 0, rotate: -20 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: 'spring' as const, stiffness: 400, damping: 14, delay: 0.08 }}
+                className="text-5xl mb-3 select-none"
+              >
+                🎉
+              </motion.div>
+              <h3 className="text-navy font-bold text-lg mb-1">Félicitations !</h3>
+              <p className="text-navy/50 text-sm mb-3">Cette tâche est-elle vraiment terminée ?</p>
+              <p className="text-navy text-sm font-semibold line-clamp-2 bg-white/30 rounded-xl px-3 py-2 mb-5">
+                &ldquo;{initialTask.title}&rdquo;
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDoneConfirm(false)}
+                  className="flex-1 border border-silver text-navy/50 hover:text-navy hover:bg-white/50 rounded-xl py-2.5 text-sm font-semibold transition-all"
+                >
+                  Non, continuer
+                </button>
+                <button
+                  onClick={confirmMarkDone}
+                  className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-xl py-2.5 text-sm transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <Check size={15} />
+                  Oui, terminée !
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }
