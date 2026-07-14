@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { User, Bell, Lock, Check, Eye, EyeOff } from 'lucide-react'
+import { User, Bell, Lock, Check, Eye, EyeOff, Monitor } from 'lucide-react'
+import ThemeToggle from '@/components/ThemeToggle'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 
@@ -196,6 +197,15 @@ export default function ProfilePage() {
               </button>
             )}
           </div>
+        </motion.div>
+
+        {/* Appearance */}
+        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.09 }} className="glass rounded-2xl p-5">
+          <div className="flex items-center gap-3 mb-5">
+            <Monitor size={18} className="text-brand" />
+            <h2 className="text-navy font-bold">Apparence</h2>
+          </div>
+          <ThemeToggle mode="toggle" />
         </motion.div>
 
         {/* Change password */}

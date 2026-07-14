@@ -9,6 +9,7 @@ import {
   LayoutDashboard, ListTodo, KanbanSquare, Calendar, BarChart3,
   Users, User, LogOut, Clock,
 } from 'lucide-react'
+import ThemeToggle from '@/components/ThemeToggle'
 
 const navItems = [
   { href: '/dashboard', label: 'Mes tâches', icon: LayoutDashboard },
@@ -103,6 +104,7 @@ export default function Sidebar({ role, fullName }: SidebarProps) {
               Profil
             </div>
           </Link>
+          <ThemeToggle mode="nav" />
           <button
             onClick={() => setShowConfirm(true)}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold text-navy/60 hover:text-red-500 hover:bg-red-50 transition-all"
