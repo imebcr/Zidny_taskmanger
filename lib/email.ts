@@ -1,18 +1,20 @@
 import nodemailer from 'nodemailer'
- 
+import type SMTPTransport from 'nodemailer/lib/smtp-transport'
+
 interface EmailPayload {
   to: string
   subject: string
   html: string
 }
- 
+
 const transporter = nodemailer.createTransport({
   service: 'gmail',
+  family: 4, // avoid hanging on unreachable IPv6 routes on hosts without IPv6 connectivity
   auth: {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_APP_PASSWORD,
   },
-})
+} as SMTPTransport.Options)
  
 export async function sendEmail({ to, subject, html }: EmailPayload) {
   if (!process.env.GMAIL_APP_PASSWORD) {
