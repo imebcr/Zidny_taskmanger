@@ -57,7 +57,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const body = await req.json()
     const data = updateSchema.parse(body)
 
-    if (!isAdmin && data.status && !['IN_PROGRESS', 'DONE'].includes(data.status)) {
+    if (!isAdmin && data.status && data.status !== task.status && !['IN_PROGRESS', 'DONE'].includes(data.status)) {
       return NextResponse.json({ error: 'Action non autorisée' }, { status: 403 })
     }
 

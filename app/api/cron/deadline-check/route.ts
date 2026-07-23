@@ -9,7 +9,7 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 function isAuthorized(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
   if (!secret) return true
-  return request.headers.get('x-cron-secret') === secret
+  return request.headers.get('authorization') === `Bearer ${secret}`
 }
 
 async function handler(request: NextRequest) {
